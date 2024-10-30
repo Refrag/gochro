@@ -26,6 +26,6 @@ config.json
 !config_sample.json
 *.secret
 *.env
-chrome.json
+#chrome.json
 gochro
 dist/

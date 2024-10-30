@@ -54,7 +54,7 @@ func randStringRunes(n int) string {
 func main() {
 	var host string
 	var wait time.Duration
-	flag.StringVar(&host, "host", "127.0.0.1:8080", "IP and Port to bind to")
+	flag.StringVar(&host, "host", "0.0.0.0:8080", "IP and Port to bind to")
 	flag.BoolVar(&ignoreCertErrors, "ignore-cert-errors", true, "Ignore Certificate Errors when taking screenshots of fetching ressources")
 	flag.BoolVar(&debugOutput, "debug", false, "Enable DEBUG mode")
 	flag.BoolVar(&disableSandbox, "disable-sandbox", false, "Disable chromium sandbox")
@@ -145,7 +145,7 @@ func (app *application) toHTML(ctx context.Context, url string, w, h *int, userA
 
 func (app *application) execChrome(ctxMain context.Context, action, url string, w, h *int, userAgent *string) ([]byte, error) {
 	args := []string{
-		"--headless=new", // https://developer.chrome.com/articles/new-headless/
+		"--headless=old", // https://developer.chrome.com/articles/new-headless/
 		"--disable-gpu",
 		"--disable-software-rasterizer",
 		"--virtual-time-budget=55000", // 55 secs, context timeout is 1 minute
