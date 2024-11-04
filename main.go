@@ -8,6 +8,9 @@ import (
 	"context"
 	"flag"
 	"fmt"
+	"image"
+	"image/draw"
+	"image/png"
 	"io"
 	"math/rand"
 	"net/http"
@@ -30,6 +33,7 @@ import (
 const (
 	chromiumPath           = "/usr/bin/chromium-browser"
 	defaultGracefulTimeout = 5 * time.Second
+	whiteBarOffset         = 124
 )
 
 var (
@@ -132,7 +136,10 @@ func (app *application) loggingMiddleware(next http.Handler) http.Handler {
 }
 
 func (app *application) toImage(ctx context.Context, url string, w, h *int, userAgent *string) ([]byte, error) {
-	return app.execChrome(ctx, "screenshot", url, w, h, userAgent)
+	newHeight := *h
+	newHeight = newHeight + whiteBarOffset
+	fmt.Printf("newHeight: %d\n", newHeight)
+	return app.execChrome(ctx, "screenshot", url, w, &newHeight, userAgent)
 }
 
 func (app *application) toPDF(ctx context.Context, url string, w, h *int, userAgent *string) ([]byte, error) {
@@ -145,7 +152,7 @@ func (app *application) toHTML(ctx context.Context, url string, w, h *int, userA
 
 func (app *application) execChrome(ctxMain context.Context, action, url string, w, h *int, userAgent *string) ([]byte, error) {
 	args := []string{
-		"--headless=old", // https://developer.chrome.com/articles/new-headless/
+		"--headless=new", // https://developer.chrome.com/articles/new-headless/
 		"--disable-gpu",
 		"--disable-software-rasterizer",
 		"--virtual-time-budget=55000", // 55 secs, context timeout is 1 minute
@@ -153,6 +160,7 @@ func (app *application) execChrome(ctxMain context.Context, action, url string, 
 		"--hide-scrollbars",
 		"--disable-crash-reporter",
 		"--block-new-web-contents",
+		"--device-scale-factor=1",
 	}
 
 	if w != nil && *w > 0 && h != nil && *h > 0 {
@@ -230,6 +238,20 @@ func (app *application) execChrome(ctxMain context.Context, action, url string, 
 		if err != nil {
 			return nil, fmt.Errorf("could not read temp file: %w", err)
 		}
+		// Remove the last whiteBarOffset pixels from the bottom of the screenshot
+		img, err := png.Decode(bytes.NewReader(content))
+		if err != nil {
+			return nil, fmt.Errorf("could not decode PNG: %w", err)
+		}
+		bounds := img.Bounds()
+		newImg := image.NewRGBA(image.Rect(0, 0, bounds.Max.X, bounds.Max.Y-whiteBarOffset))
+		draw.Draw(newImg, newImg.Bounds(), img, image.Point{0, 0}, draw.Src)
+
+		var buf bytes.Buffer
+		if err := png.Encode(&buf, newImg); err != nil {
+			return nil, fmt.Errorf("could not encode PNG: %w", err)
+		}
+		content = buf.Bytes()
 	case "pdf":
 		outfile := path.Join(tmpdir, "output.pdf")
 		content, err = os.ReadFile(outfile)
